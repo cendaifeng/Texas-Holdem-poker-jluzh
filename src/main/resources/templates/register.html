@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org">
+	<head>
+		<meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+		<meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
+		<meta name="description" content="">
+		<meta name="author" content="">
+		<title>REGISTER</title>
+		<!-- Bootstrap core CSS -->
+		<link th:href="@{/webjars/bootstrap/4.5.2/css/bootstrap.min.css}" rel="stylesheet">
+		<!-- Custom styles for this template -->
+		<link th:href="@{/asserts/css/signin.css}" rel="stylesheet">
+	</head>
+
+	<body class="text-center">
+		<!-- action 表单提交路径 -->
+		<form class="form-signin" action="hall.html" th:action="@{/user/register}" method="post">
+			<img class="mb-4" th:src="@{/asserts/img/poker_img-01.svg}" alt="" width="72" height="72">
+			<h1 class="h3 mb-3 font-weight-normal" >Please register</h1>
+			<div>
+			<label class="sr-only" >Userid</label>
+			<!-- name 属性能够将数据放入 request 域中 -->
+			<input type="text" name="id" class="form-control" placeholder="User ID" required="" autofocus="">
+				<br/>
+			</div>
+			<div>
+			<label class="sr-only" >Password</label>
+			<input type="password" name="password" class="form-control" placeholder="Password" required="">
+
+			</div>
+			<div>
+			<label class="sr-only" >rePassword</label>
+			<input type="password" name="repassword" class="form-control" placeholder="check Password" required="">
+				<br/>
+			</div>
+			<div>
+			<label class="sr-only" >nickname</label>
+			<input type="text" name="name" class="form-control" placeholder="your nick name" required="">
+				<br/>
+			</div>
+			<div>
+			<label class="sr-only" >bankroll</label>
+			<input type="text" name="bankroll" class="form-control" placeholder="money you want to bet" required="">
+			</div>
+			<br/>
+			<button class="btn btn-lg btn-primary btn-danger" type="submit">Register</button>
+			<p class="mt-5 mb-3 text-muted">© 2020-2021</p>
+		</form>
+	</body>
+
+</html>

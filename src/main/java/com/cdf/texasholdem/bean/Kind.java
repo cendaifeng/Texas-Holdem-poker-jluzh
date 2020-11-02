@@ -14,7 +14,7 @@ public enum Kind {
     JAKE("J", 5500),
     QUEEN("Q", 6000),
     KING("K", 6500),
-    ACE("1", 7000);
+    ACE("A", 7000);
 
     private final String name;
     private final long value;
@@ -26,5 +26,9 @@ public enum Kind {
 
     public long getValue() {
         return value;
+    }
+
+    public String getName() {
+        return name;
     }
 }

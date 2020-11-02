@@ -1,0 +1,180 @@
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
+    <meta name="description" content="">
+    <meta name="author" content="">
+    <link href="/static/asserts/css/bootstrap.min.css" th:href="@{/webjars/bootstrap/4.5.2/css/bootstrap.min.css}" rel="stylesheet">
+    <link href="/static/asserts/css/signin.css" th:href="@{/asserts/css/signin.css}" rel="stylesheet">
+    <title>Playing</title>
+</head>
+<style>
+    body
+    {
+        background-image:url('/asserts/img/texas-bg.png');
+        background-repeat:repeat-x;
+        background-position:top;
+        align-items:baseline;
+    }
+
+    .container-info {
+        /*max-width:1920px!important;*/
+        height: 200px;
+        background-color: lightgrey;
+    }
+
+    .container-sec-info {
+        height: 100px;
+        background-color: floralwhite;
+    }
+
+    .flex-item {
+        background-color: cornflowerblue;
+        width: 100px;
+        margin: 10px;
+    }
+</style>
+<body>
+<div class="d-flex w-100 h-100 flex-column">
+
+<!--    <div class="d-flex justify-content-around align-items-center" style="height: 200px;">-->
+
+<!--    </div>-->
+
+<!--    <div class="d-flex" style="height:150px;">-->
+<!--    </div>-->
+
+<!--    <div class="d-flex w-100">-->
+<!--    </div>-->
+
+<!--    <div class="d-flex align-items-center"></div>-->
+
+    <div class="d-flex justify-content-between align-items-center" id="myCards">
+        <div id="myButton" class="d-flex justify-content-around" style="width:40%!important">
+            <div class="">
+                <button id="beforeShuffle" class="btn btn-lg btn-warning btn-block" type="button">beforeShuffle</button>
+            </div>
+            <div class="">
+                <button id="afterShuffle" class="btn btn-lg btn-outline-danger btn-block" type="button">afterShuffle</button>
+            </div>
+            <div class="">
+                <button id="afterSort" class="btn btn-lg btn-success btn-block" type="button">afterSort</button>
+            </div>
+            <div class="">
+                <button id="license_modal_btn" class="btn btn-lg btn-light btn-block" type="button">licensing</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="card01" class="d-flex"></div>
+</div>
+
+
+
+<div class="modal fade" id="tableLicenseModal" tabindex="-1" role="dialog" aria-labelledby="myModalLabel">
+    <div class="modal-dialog" role="document">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h4 class="modal-title" id="myModalLabel">发牌</h4>
+                <button type="button" class="close" data-dismiss="modal" aria-label="Close"><span aria-hidden="true">&times;</span></button>
+            </div>
+            <div class="modal-body">
+
+                <form class="form-horizontal">
+                    <div class="form-group">
+                        <label for="license_input" class="col-md-4 control-label">分发人数</label>
+                        <div class="col-md-8">
+                            <input type="text" name="tableIndex" class="form-control" id="license_input" placeholder="">
+                            <span class="help-block"/>
+                        </div>
+                    </div>
+                </form>
+
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-default" data-dismiss="modal">Close</button>
+                <button type="button" class="btn btn-primary" id="raise_btn">licensing</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+</body>
+
+<script src="/static/asserts/js/jquery-3.2.1.slim.min.js" th:src="@{/webjars/jquery/3.5.1/jquery.min.js}"></script>
+<script src="/static/asserts/js/bootstrap.min.js" th:src="@{/webjars/bootstrap/4.5.2/js/bootstrap.min.js}"></script>
+<script th:inline="javascript">
+
+    var beforeShuffle = null;
+    var afterShuffle = null;
+    var afterSort = null;
+
+    $("#beforeShuffle").click(function () {
+        $("#card01").html("");
+        let l = $("<div></div>");
+        $.each(beforeShuffle, function (i,value) {
+            l.append("<img class=\"mb-4\" src=\"asserts/img/cards/"+value+"\" height=\"150\" width=\"80\">");
+            l.appendTo($("#card01"));
+        })
+    });
+    $("#afterShuffle").click(function () {
+        $("#card01").html("");
+        let l = $("<div></div>");
+        $.each(afterShuffle, function (i,value) {
+            l.append("<img class=\"mb-4\" src=\"asserts/img/cards/"+value+"\" height=\"150\" width=\"80\">");
+            l.appendTo($("#card01"));
+        })
+    });
+    $("#afterSort").click(function () {
+        $("#card01").html("");
+        let l = $("<div></div>");
+        $.each(afterSort, function (i,value) {
+            l.append("<img class=\"mb-4\" src=\"asserts/img/cards/"+value+"\" height=\"150\" width=\"80\">");
+            l.appendTo($("#card01"));
+        })
+    });
+
+    $("#license_modal_btn").click(function () {
+        // 表单重置
+        // reset_form("#tableCreateModal form");
+        // 弹出
+        $("#tableLicenseModal").modal({
+            backdrop:"static"
+        });
+    });
+
+    // 点击按钮，将填写的数据提交给服务器
+    $("#raise_btn").click(function () {
+        $.ajax({
+            type: 'POST',
+            url: "/license",
+            data: {
+                "num": $("#license_input").val()
+            },
+            success: function (response) {
+                beforeShuffle=response.data.beforeShuffle;
+                afterShuffle=response.data.afterShuffle;
+                afterSort=response.data.afterSort;
+            }
+        })
+        // 关闭框框
+        $("#tableLicenseModal").modal('hide');
+    });
+
+    function httpRequest(method, url, params) {
+        var form = $("<form method="+method+"></form>");
+        form.attr({"action":url});
+        for (pa in params) {
+            var input = $("<input type='hidden'>");
+            input.attr({"name":pa});
+            input.val(params[pa]);
+            form.append(input);
+        }
+        $("html").append(form);
+        form.submit();
+    }
+
+
+</script>
+</html>

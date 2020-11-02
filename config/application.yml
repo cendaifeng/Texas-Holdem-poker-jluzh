@@ -2,6 +2,11 @@ spring:
   profiles:
     active: dev
 
+
+---
+spring:
+  profiles: dev
+
   thymeleaf:
     cache: false
     prefix: classpath:/templates/
@@ -10,6 +15,9 @@ spring:
     mode: HTML
 
   mvc:
+    #    view:
+    #      prefix: classpath:/templates/
+    #      suffix: .html
     date-format: yyyy-MM-dd
     hiddenmethod:
       filter:
@@ -40,13 +48,10 @@ spring:
     useGlobalDataSourceStat: true
     connectionProperties: druid.stat.mergeSql=true;druid.stat.slowSqlMillis=500
 
+
 sever:
   tomcat:
     uri-encoding: UTF-8
-
----
-spring:
-  profiles: dev
 
 logging:
   level:

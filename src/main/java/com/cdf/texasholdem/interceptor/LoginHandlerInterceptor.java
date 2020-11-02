@@ -14,12 +14,12 @@ public class LoginHandlerInterceptor implements HandlerInterceptor {
 //    public boolean preHandle(HttpServletRequest request, HttpServletResponse response, Object handler) throws Exception {
 //        Object user = request.getSession().getAttribute("loginUser");
 //        if ( null == user ) {
-//            request.setAttribute("msg", "没有权限请先登录");
-//            request.getRequestDispatcher("/index.html").forward(request, response);
+////            request.setAttribute("msg", "没有权限请先登录");
+////            request.getRequestDispatcher("/index.html").forward(request, response);
 //            return false;
 //        } else {
 //            return true;
 //        }
 //    }
-
+//
 }

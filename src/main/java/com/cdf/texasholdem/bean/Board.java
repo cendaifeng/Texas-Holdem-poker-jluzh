@@ -8,7 +8,7 @@ public class Board {
 
     private Poker[] boardCards;
 
-    private Integer pot;
+    private Integer pot = 0;
 
     // 初始 3 个台面牌位
     public Board() {

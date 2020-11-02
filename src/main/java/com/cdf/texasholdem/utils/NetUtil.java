@@ -21,6 +21,7 @@ public class NetUtil {
     public static String getGivenCookies(Cookie[] cookies, String key) {
         String value = null;
         for (Cookie x : cookies) {
+            System.out.println(x.getValue());
             if (x.getName().equals(key)) {
                 value = x.getValue();
                 break;

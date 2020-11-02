@@ -6,10 +6,12 @@ import com.cdf.texasholdem.utils.GameUtil;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.stereotype.Service;
 
 import java.util.*;
 import java.util.concurrent.*;
 
+@Service
 public class RunGame {
 
     @Autowired
@@ -35,6 +37,22 @@ public class RunGame {
     // this.run() 时定义
     private ArrayBlockingQueue<String> gameStatusQueue = null;
 
+    /**
+     * 以下字段用于 PlayerContoller 对牌桌的游戏状态监听
+     */
+    // 专用于状态监听，玩家在弃牌后不会被删除
+    private CopyOnWriteArrayList<Person> listenerArrayList = null;
+    // nextPlayer()时置为true。在所有玩家接受完状态变更信息后置为false
+    private boolean ifMsgChange = false;
+
+    private String playerOperation = null;
+
+    private Integer operationValue = null;
+
+    private String playerName;
+
+    private CountDownLatch countDownLatch = null;
+
     Logger logger = LoggerFactory.getLogger(this.getClass());
 
     public RunGame() {
@@ -57,8 +75,17 @@ public class RunGame {
         callLimited = 0;
         playerQueue = null;
         gameStatus = null;
+        listenerArrayList = null;
         winner = null;
         isRun = false;
+    }
+
+    public CopyOnWriteArrayList<Person> getListenerArrayList() {
+        return listenerArrayList;
+    }
+
+    public void setListenerArrayList(CopyOnWriteArrayList<Person> listenerArrayList) {
+        this.listenerArrayList = listenerArrayList;
     }
 
     public boolean isRun() {
@@ -117,6 +144,46 @@ public class RunGame {
         this.tableIndex = tableIndex;
     }
 
+    public boolean isMsgChange() {
+        return ifMsgChange;
+    }
+
+    public void setIfMsgChange(boolean ifMsgChange) {
+        this.ifMsgChange = ifMsgChange;
+    }
+
+    public CountDownLatch getCountDownLatch() {
+        return countDownLatch;
+    }
+
+    public void setCountDownLatch(CountDownLatch countDownLatch) {
+        this.countDownLatch = countDownLatch;
+    }
+
+    public String getPlayerOperation() {
+        return playerOperation;
+    }
+
+    public void setPlayerOperation(String playerOperation) {
+        this.playerOperation = playerOperation;
+    }
+
+    public Integer getOperationValue() {
+        return operationValue;
+    }
+
+    public void setOperationValue(Integer operationValue) {
+        this.operationValue = operationValue;
+    }
+
+    public String getPlayerName() {
+        return playerName;
+    }
+
+    public void setPlayerName(String playerName) {
+        this.playerName = playerName;
+    }
+
     /**
      * 由 RunGameController 中的 begin() 调用
      */
@@ -151,6 +218,7 @@ public class RunGame {
                 setWinner(person);
                 person.setBankRoll(person.getBankRoll() + board.getPot());
                 personMapper.updateBankRoll(person);
+                logger.trace("game over! the winner is "+person.toString());
                 this.RunGameReset();
             } catch (Exception ex) {
                 ex.printStackTrace();
@@ -194,13 +262,29 @@ public class RunGame {
     }
 
     /**
-     * 切换到下一回合
+     * 切换到 下一位选手 或 下一回合
      * 若队列中的元素已经取尽，则判断游戏是否应该进入下一阶段
      * 调用ArrayBlockingQueue的阻塞等待出队入队方法
      * 将出队元素的status设为true
+     * @param playerOperation 玩家操作
+     * @param operationValue 操作数值
+     * 该信息作为变更信息供Controller进行获取，传递给前端
      */
-    public void nextPlayer() {
+    public void nextPlayer(String playerName, String playerOperation, Integer operationValue) {
+        this.playerName = playerName;
+        this.playerOperation = playerOperation;
+        this.operationValue = operationValue;
+
+        logger.debug("nextPlayer");
+        countDownLatch = new CountDownLatch(listenerArrayList.size());
+        ifMsgChange = true;
         try {
+            countDownLatch.await();
+        } catch (InterruptedException e) {
+            e.printStackTrace();
+        }
+        try {
+            // 若玩家队列已用尽，则搜寻玩家列表中尚未完成下注要求的玩家
             if (playerQueue.size() == 0) {
                 Iterator<Person> i = players.iterator();
                 while (i.hasNext()) {
@@ -212,8 +296,10 @@ public class RunGame {
                 if (playerQueue.size() == 0)
                     nextRound();
             }
+            // 若玩家队列没有用尽，则取出一个，置其状态为true
             if (playerQueue.size() > 0) {
                 Person person = playerQueue.take();
+                logger.debug("P:"+person.toString());
                 person.setStatus(true);
                 //this.playerQueue.put(person);
             }
@@ -223,15 +309,18 @@ public class RunGame {
     }
 
     private void nextRound() {
+        logger.debug("nextRound");
         if (players.size() == 1) {
             setGameStatus("over");
             gameStatusQueue.clear();
         }
         if (gameStatusQueue.size() > 0) {
             try {
-                setGameStatus(gameStatusQueue.take());
+                String status = gameStatusQueue.take();
+                setGameStatus(status);
                 playerQueue.addAll(players);
-                nextPlayer();
+                logger.debug("now gameStatus: "+status);
+                nextPlayer(null, null, null);
             } catch (InterruptedException e) {
                 e.printStackTrace();
             }
@@ -248,8 +337,8 @@ public class RunGame {
             p.getPokers()[1] = cards.remove(0);
         }
         // for test
-//        people.stream().map( x -> Arrays.asList(x.getPokers()) )
-//                .forEach(System.out::println);
+        players.stream().map( x -> Arrays.asList(x.getPokers()) )
+                .forEach(System.out::println);
     }
 
     /**
@@ -282,6 +371,28 @@ public class RunGame {
         // 检验是否在玩家回合
         if (!player.getStatus())
             return false;
+        if ( player.getBankRoll() >= wager ) {
+            player.setBankRoll(player.getBankRoll() - wager);
+            personMapper.updateBankRoll(player);
+            this.board.addPot(wager);
+            // 新最小跟注限制 = 下注 + 已下注金额
+            this.callLimited = wager + player.getCurrentWager();
+            player.setCurrentWager(wager + player.getCurrentWager());
+            return true;
+        } else {
+            return false;
+        }
+    }
+
+    /**
+     * 玩家下注（不检验玩家回合）
+     * 用于初始化时大小盲的下注
+     * @param index 下注玩家序列号
+     * @param wager 下注金额
+     * @return 若下注数目不满足要求返回 false
+     */
+    public boolean playerBetWithoutCheck(int index, int wager) {
+        Person player = this.players.get(index);
         if ( player.getBankRoll() >= wager ) {
             player.setBankRoll(player.getBankRoll() - wager);
             personMapper.updateBankRoll(player);

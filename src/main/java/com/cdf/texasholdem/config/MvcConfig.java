@@ -10,13 +10,13 @@ import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
  * Springboot 2.0 后摒弃了继承 WebMvcConfigurerAdapter 类
  * 因为 WebMvcConfigurer 接口改用 default 定义方法，无需实现全部方法，也就无需实现空方法的适配器类了
  */
-@Configuration
-public class MvcConfig implements WebMvcConfigurer {
-    @Override
-    public void addViewControllers(ViewControllerRegistry registry) {
-        registry.addViewController("/").setViewName("login");
-        registry.addViewController("/index.html").setViewName("login");
-    }
+//@Configuration
+//public class MvcConfig implements WebMvcConfigurer {
+//    @Override
+//    public void addViewControllers(ViewControllerRegistry registry) {
+//        registry.addViewController("/").setViewName("login");
+//        registry.addViewController("/index.html").setViewName("login");
+//    }
 
     /**
      * 注册拦截器
@@ -29,4 +29,4 @@ public class MvcConfig implements WebMvcConfigurer {
 //                .excludePathPatterns("/", "/index.html", "/user/login")
 //                .excludePathPatterns("/webjars/**", "/asserts/**");
 //    }
-}
+//}

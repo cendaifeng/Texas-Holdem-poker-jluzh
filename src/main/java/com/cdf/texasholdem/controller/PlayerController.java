@@ -1,16 +1,17 @@
 package com.cdf.texasholdem.controller;
 
-import com.cdf.texasholdem.bean.Msg;
+import com.cdf.texasholdem.bean.ServerResponse;
 import com.cdf.texasholdem.bean.Person;
 import com.cdf.texasholdem.bean.Poker;
 import com.cdf.texasholdem.service.RunGame;
 import com.cdf.texasholdem.service.RunGameManager;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.ui.ModelMap;
 import org.springframework.web.bind.annotation.*;
 
 import javax.servlet.http.HttpSession;
-import java.util.concurrent.FutureTask;
+import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.locks.ReentrantLock;
 
 /**
@@ -26,21 +27,25 @@ public class PlayerController {
     Logger logger = LoggerFactory.getLogger(this.getClass());
 
     /**
-     * 玩家状态查询,同时返回公共牌和赢家
-     * 若不在玩家当前回合则阻塞等待，若轮到玩家则返回
+     * 玩家状态查询,同时返回下注信息，公共牌，和赢家
+     * 若不在玩家当前回合则阻塞等待，若轮到玩家则返回xxxx
+     * 若游戏状态未发生改变则阻塞等待，若轮到玩家则返回
      * 这里前端会建立Ajax长轮询
      * @param session
      * @return 若返回Msg.success()则该玩家的按钮高亮
      */
-    @GetMapping("/player/status")
-    public Msg getStatus(HttpSession session) {
+    @GetMapping("/player/polling")
+    public ServerResponse getStatus(HttpSession session, ModelMap map) {
         Integer tableIndex = (Integer) session.getAttribute("tableIndex");
         Integer playerIndex = (Integer) session.getAttribute("playerIndex");
         RunGame table = RunGameManager.getRunGameHashMap().get(tableIndex);
-        Person person = table.getPlayers().get(playerIndex);
+        logger.debug("status:"+tableIndex.toString());
+        CopyOnWriteArrayList<Person> players = table.getPlayers();
+        Person person = players.get(playerIndex);
+        ServerResponse serverResponse = new ServerResponse();
 
         int timestamp = 0;
-        while (!person.getStatus()) {
+        while (!table.isMsgChange()) {
             // 玩家状态为不是当前回合，等待
             try {
                 Thread.sleep(500);
@@ -49,25 +54,59 @@ public class PlayerController {
             }
             timestamp++;
             if (timestamp >= 60) {
-                Msg msg = Msg.fail().add("msg", "超时").add("boardCard", table.getBoard().getBoardCards());
-                if (table.getWinner() != null)
-                    msg.add("winner", table.getWinner());
-                return msg;
+                serverResponse.add("msg", "超时");
+                serverResponse.setCode(200);
+//                if (table.getWinner() != null)
+//                    serverResponse.add("winner", table.getWinner());
+                return serverResponse;
             }
         }
-        // 开启一个线程，在30s之后将status置为false，防止有人越过前端Ajax超时限制
-        FutureTask<Integer> futureTask = new FutureTask(() -> {
-            Thread.sleep(30000);
-            if (person.getStatus()) {
-                person.setStatus(false);
-            }
-            return 1;
-        });
-        new Thread(futureTask).start();
-        Msg msg = Msg.success().add("msg", "轮到你了").add("boardCard", table.getBoard().getBoardCards());
+//        // 开启一个线程，在30s之后将status置为false，防止有人越过前端Ajax超时限制
+//        FutureTask<Integer> futureTask = new FutureTask(() -> {
+//            Thread.sleep(30000);
+//            if (person.getStatus()) {
+//                person.setStatus(false);
+//            }
+//            return 1;
+//        });
+//        new Thread(futureTask).start();
+
+        Integer pot = table.getBoard().getPot();
+        System.out.println("======================"+pot+"===================");
+        if (pot != null) {
+            serverResponse.add("pot", pot);
+        }
+
+        Poker[] boardCards = table.getBoard().getBoardCards();
+        System.out.println(boardCards);
+        if (boardCards[0] != null) {
+            serverResponse.add("boardCard", boardCards);
+        }
+
+        String playerName = table.getPlayerName();
+        System.out.println("======================"+playerName+"===================");
+        if (playerName != null) {
+            serverResponse.add("playerName", playerName);
+        }
+
+        String playerOperation = table.getPlayerOperation();
+        System.out.println("======================"+playerOperation+"===================");
+        if (playerOperation != null) {
+            serverResponse.add("playerOperation", playerOperation);
+        }
+
+        Integer operationValue = table.getOperationValue();
+        System.out.println("======================"+operationValue+"===================");
+        if (operationValue != null) {
+            serverResponse.add("operationValue", operationValue);
+        }
+
+        if (person.getStatus())
+            serverResponse.add("msg", "轮到你了");
         if (table.getWinner() != null)
-            msg.add("winner", table.getWinner());
-        return msg;
+            serverResponse.add("winner", table.getWinner());
+        table.getCountDownLatch().countDown();
+        return serverResponse;
     }
 
     /**
@@ -76,26 +115,27 @@ public class PlayerController {
      * @return
      */
     @GetMapping("/player/cards")
-    public Msg getCards(HttpSession session) {
+    public ServerResponse getCards(HttpSession session) {
         Integer tableIndex = (Integer) session.getAttribute("tableIndex");
         Integer playerIndex = (Integer) session.getAttribute("playerIndex");
         RunGame table = RunGameManager.getRunGameHashMap().get(tableIndex);
 
-        Poker[] pokers = table.getPlayers().get(playerIndex).getPokers();
-        return Msg.success().add("pokers", pokers);
+        Person person = table.getPlayers().get(playerIndex);
+        Poker[] pokers = person.getPokers();
+        return ServerResponse.success().add("pokers", pokers);
     }
 
     /**
      * 玩家下注操作
-     * 调用RunGame.nextRound()将玩家轮次后移，并将该玩家状态置false
+     * 调用RunGame.nextPlayer()将玩家轮次后移，并将该玩家状态置false
      * 加锁，防止玩家重复提交表单导致的重复下注
      * @param wager 下注数量
      * @param session Session域
      * @return
      */
     @PostMapping("/player/bet")
-    public Msg bet(@RequestParam int wager,
-                      HttpSession session) {
+    public ServerResponse bet(@RequestParam int wager,
+                              HttpSession session) {
         Integer tableIndex = (Integer) session.getAttribute("tableIndex");
         Integer playerIndex = (Integer) session.getAttribute("playerIndex");
         RunGame table = RunGameManager.getRunGameHashMap().get(tableIndex);
@@ -104,43 +144,70 @@ public class PlayerController {
         reentrantLock.lock();
         if (person.getCurrentWager() + wager >= table.getCallLimited()) {
             if (!table.playerBet(playerIndex, wager)) {
-                return Msg.fail().add("msg", "错误：玩家金额不足或未到玩家回合");
+                return ServerResponse.fail().add("msg", "错误：玩家金额不足或未到玩家回合");
             }
-            table.nextPlayer();
+            table.nextPlayer(person.getName(), "bet", wager);
             person.setStatus(false);
         } else {
-            return Msg.fail().add("msg", "错误：下注小于最小跟注限制");
+            return ServerResponse.fail().add("msg", "错误：下注小于最小跟注限制");
         }
         reentrantLock.unlock();
-        return Msg.success();
+        return ServerResponse.success();
+    }
+
+    /**
+     * 玩家过牌操作
+     * 调用RunGame.nextRound()将玩家轮次后移，并将该玩家状态置false
+     * 加锁，防止玩家重复提交表单
+     * @param session Session域
+     * @return
+     */
+    @PostMapping("/player/check")
+    public ServerResponse check(HttpSession session) {
+        Integer tableIndex = (Integer) session.getAttribute("tableIndex");
+        Integer playerIndex = (Integer) session.getAttribute("playerIndex");
+        RunGame table = RunGameManager.getRunGameHashMap().get(tableIndex);
+        Person person = table.getPlayers().get(playerIndex);
+
+        reentrantLock.lock();
+        if (person.getCurrentWager() >= table.getCallLimited()) {
+            // 检验是否在玩家回合
+            if (!person.getStatus())
+                return ServerResponse.fail().add("msg", "错误：未到玩家回合");
+            table.nextPlayer(person.getName(), "check", null);
+            person.setStatus(false);
+        } else {
+            return ServerResponse.fail().add("msg", "错误：下注小于最小跟注限制，不能过牌");
+        }
+        reentrantLock.unlock();
+        return ServerResponse.success();
     }
 
     /**
      * 玩家全押操作
-     * @param wager 下注数量
      * @param session Session域
      * @return
      */
     @PutMapping("/player/bet")
-    public Msg allIn(@RequestParam int wager,
-                        HttpSession session) {
+    public ServerResponse allIn(HttpSession session) {
         Integer tableIndex = (Integer) session.getAttribute("tableIndex");
         Integer playerIndex = (Integer) session.getAttribute("playerIndex");
         RunGame table = RunGameManager.getRunGameHashMap().get(tableIndex);
         Person person = table.getPlayers().get(tableIndex);
 
+        Integer wager = person.getBankRoll();
         reentrantLock.lock();
         if (!table.playerBet(playerIndex, wager))
-            Msg.fail().add("msg", "错误：玩家金额不足或未到玩家回合");
+            ServerResponse.fail().add("msg", "错误：玩家金额不足或未到玩家回合");
         if (person.getCurrentWager() > table.getCallLimited()) {
             // 已更新过已下注金额
             table.setCallLimited(person.getCurrentWager());
         }
         person.setAllin(true);
-        table.nextPlayer();
+        table.nextPlayer(person.getName(), "allin", wager);
         person.setStatus(false);
         reentrantLock.unlock();
-        return Msg.success();
+        return ServerResponse.success();
     }
 
     /**
@@ -148,20 +215,20 @@ public class PlayerController {
      * @param session
      * @return
      */
-    @DeleteMapping("/player/fold")
-    public Msg fold(HttpSession session) {
+    @PostMapping("/player/fold")
+    public ServerResponse fold(HttpSession session) {
         Integer tableIndex = (Integer) session.getAttribute("tableIndex");
         Integer playerIndex = (Integer) session.getAttribute("playerIndex");
-        logger.debug(playerIndex.toString());
+        logger.debug("fold: "+playerIndex.toString());
         RunGame table = RunGameManager.getRunGameHashMap().get(tableIndex);
         Person person = table.getPlayers().get(playerIndex);
 
         reentrantLock.lock();
         table.playerFold(playerIndex);
-        table.nextPlayer();
+        table.nextPlayer(person.getName(), "fold", null);
         person.setStatus(false);
         reentrantLock.unlock();
-        return Msg.success();
+        return ServerResponse.success();
     }
 
 }

@@ -1,21 +1,17 @@
 package com.cdf.texasholdem.controller;
 
-import com.cdf.texasholdem.bean.Msg;
+import com.cdf.texasholdem.bean.ServerResponse;
 import com.cdf.texasholdem.bean.Person;
 import com.cdf.texasholdem.mapper.PersonMapper;
 import com.cdf.texasholdem.service.RunGame;
 import com.cdf.texasholdem.service.RunGameManager;
-import org.apache.logging.log4j.util.Strings;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Controller;
-import org.springframework.util.StringUtils;
 import org.springframework.web.bind.annotation.*;
 
 import javax.servlet.http.*;
-import java.util.Collections;
-import java.util.Optional;
 import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.FutureTask;
@@ -33,6 +29,9 @@ public class RunGameController {
     @Autowired
     PersonMapper personMapper;
 
+    @Autowired
+    RunGame runGame;
+
     Logger logger = LoggerFactory.getLogger(this.getClass());
 
     private static final ReentrantLock reentrantLock = new ReentrantLock();
@@ -45,12 +44,12 @@ public class RunGameController {
      */
     @ResponseBody
     @GetMapping("/rungame/create")
-    public Msg checkTable(@RequestParam Integer tableIndex) {
+    public ServerResponse checkTable(@RequestParam Integer tableIndex) {
 
         if ( !RunGameManager.runGameHashMap.containsKey(tableIndex) ){
-            return Msg.success();
+            return ServerResponse.success();
         } else {
-            return Msg.fail().setCode(301).add("msg", "该牌桌已存在");
+            return ServerResponse.fail().setCode(301).add("msg", "该牌桌已存在");
         }
     }
 
@@ -63,7 +62,7 @@ public class RunGameController {
     @PostMapping("/rungame/create")
     public String createTable(@RequestParam Integer tableIndex) {
 
-        RunGameManager.addRunGame(tableIndex, new RunGame());
+        RunGameManager.addRunGame(tableIndex, runGame);
         logger.trace("POST:/rungame/create");
         return "forward:/rungame/access";
     }
@@ -85,7 +84,7 @@ public class RunGameController {
         String userid = getGivenCookies(req.getCookies(), "loginUser");
         if (userid==null) {
             logger.error("用户登录信息有误");
-            return "index";
+            return "login";
         }
         session.setAttribute("tableIndex", tableIndex);
         RunGame table;
@@ -94,14 +93,17 @@ public class RunGameController {
             table.setTableIndex(tableIndex);
         } catch (NullPointerException e) {
             logger.error("居然找不到牌桌");
-            e.printStackTrace();
-            return "playing";
+            return "/rungame/list";
+        }
+        if (table.getPlayers().size() >= 8) {
+            logger.error("牌桌玩家超过八人，无法进入");
+            return "/rungame/list";
         }
         // 到数据库中找person
         Person person = personMapper.getPersonById(userid);
         if (person.getBankRoll()<2) {
             logger.error("该玩家没钱");
-            return "index";
+            return "/rungame/list";
         }
 
         boolean b = table.getPlayers().stream()
@@ -110,7 +112,7 @@ public class RunGameController {
             table.addPlayer(person);
         } else {
             logger.error("该玩家已加入牌桌");
-            return "index";
+            return "/rungame/list";
         }
         // 玩家编号从0开始
         int playerIndex = table.getPlayers().size() - 1;
@@ -130,40 +132,44 @@ public class RunGameController {
      * @return
      */
     @ResponseBody
-    @PostMapping("/rungame/begin")
-    public Msg begin(HttpSession session) {
+    @GetMapping("/rungame/begin")
+    public ServerResponse begin(HttpSession session) {
 
         Integer tableIndex = (Integer) session.getAttribute("tableIndex");
         RunGame table = RunGameManager.getRunGameHashMap().get(tableIndex);
-        logger.trace("POST:/rungame/begin");
+        logger.trace("GET:/rungame/begin");
         logger.trace(tableIndex.toString()+" 号桌开台");
 
         reentrantLock.lock();
         if (table.isRun())
-            return Msg.fail().add("msg", "该桌已经开始游戏");
+            return ServerResponse.fail().add("msg", "该桌已经开始游戏");
         table.setRun(true);
+        // 随机大小盲，唤醒队中第三个玩家（枪口）的下注操作
+        CopyOnWriteArrayList<Person> players = table.getPlayers();
+        table.setPlayerQueue(new ArrayBlockingQueue<Person>(players.size()));
+        ArrayBlockingQueue<Person> playerQueue = table.getPlayerQueue();
+        playerQueue.addAll(players);
+        table.setListenerArrayList(new CopyOnWriteArrayList<Person>(players));
+//        Collections.shuffle((List<?>) playerQueue);
+        try {
+            Person person = playerQueue.take();
+            playerQueue.put(person);
+            table.playerBetWithoutCheck(person.getPlayerIndex(), 1);
+            person = playerQueue.take();
+            playerQueue.put(person);
+            table.playerBetWithoutCheck(person.getPlayerIndex(), 2);
+        } catch (InterruptedException e) {
+            e.printStackTrace();
+        }
+        table.nextPlayer(null, null, null);
+
         FutureTask<Integer> futureTask = new FutureTask(() -> {
             table.run();
             return 1;
         });
         new Thread(futureTask).start();
-
-        // 随机大小盲，唤醒队中第三个玩家（枪口）的下注操作
-        CopyOnWriteArrayList<Person> players = table.getPlayers();
-        Collections.shuffle(players);
-        table.setPlayerQueue(new ArrayBlockingQueue<Person>(players.size()));
-        table.getPlayerQueue().addAll(players);
-        try {
-            Person person = table.getPlayerQueue().take();
-            table.playerBet(person.getPlayerIndex(), 1);
-            person = table.getPlayerQueue().take();
-            table.playerBet(person.getPlayerIndex(), 2);
-        } catch (InterruptedException e) {
-            e.printStackTrace();
-        }
-        table.nextPlayer();
         reentrantLock.unlock();
-        return Msg.success();
+        return ServerResponse.success();
     }
 
     @PostMapping("/rungame/exit")
