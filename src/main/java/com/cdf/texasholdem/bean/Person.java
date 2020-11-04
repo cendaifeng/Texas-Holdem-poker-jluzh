@@ -5,6 +5,7 @@ import org.springframework.stereotype.Component;
 import javax.validation.constraints.NotBlank;
 import javax.validation.constraints.Pattern;
 import java.util.Arrays;
+import java.util.concurrent.LinkedBlockingQueue;
 
 @Component
 public class Person {
@@ -15,6 +16,8 @@ public class Person {
     private Integer playerIndex = -1;
     private boolean status = false;
     private boolean isAllin = false;
+    // 游戏状态消息队列，用于响应给前端的长轮询请求
+    private LinkedBlockingQueue<ServerResponse> MsgQueue = new LinkedBlockingQueue();
     // for DAO
     private String UUID;
     @Pattern(regexp = "(^[a-zA-Z0-9_-]{6,16}$)",
@@ -24,8 +27,7 @@ public class Person {
     private String password;
     private String name;
 
-    public Person() {
-    }
+    public Person() { }
 
     public Person(String id, String password, String name, Integer bankroll) {
         this.id = id;
@@ -37,6 +39,14 @@ public class Person {
     // for test
     public Person(String name) {
         this.name = name;
+    }
+
+    public LinkedBlockingQueue<ServerResponse> getMsgQueue() {
+        return MsgQueue;
+    }
+
+    public void setMsgQueue(LinkedBlockingQueue<ServerResponse> msgQueue) {
+        MsgQueue = msgQueue;
     }
 
     public Integer getPlayerIndex() {

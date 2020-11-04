@@ -205,9 +205,9 @@
     function long_polling() {
         $.ajax({
             type: 'get',
-            url: "/player/status",
+            url: "/player/polling",
             contentType: "application/json",
-            timeout:30000,
+            timeout:40000,
             success: function (res) {
 
                 // $('#toastDiv').append(toast_new);
@@ -216,31 +216,34 @@
                 if (res.code === 100) {
                     /* POT */
                     let pot = res.data.pot;
-                    let pot_html = "$ "+pot+" &nbsp;in the pot";
-                    $('#pot_count').html(pot_html);
+                    if (pot != null) {
+                        let pot_html = "$ " + pot + " &nbsp;in the pot";
+                        $('#pot_count').html(pot_html);
+                    }
 
                     /* BOARDCARD */
                     let board_cards = res.data.boardCards;
                     if (board_cards != null) {
-                        let b0 = board_cards[0];
-                        let b1 = board_cards[1];
-                        let b2 = board_cards[2];
-                        let inner = "<img class=\"mb-4\" th:src=\"@{/asserts/cards/2s.png}\" alt=\"\" height=\"185\">"+b0+"\n";
-                        $("#boardCards").html(inner);
-                        $("#boardCards").appendTo("<img class=\"mb-4\" th:src=\"@{/asserts/cards/2s.png}\" alt=\"\" height=\"185\">"+b1+"\n")
-                        $("#boardCards").appendTo("<img class=\"mb-4\" th:src=\"@{/asserts/cards/2s.png}\" alt=\"\" height=\"185\">"+b2+"\n")
+                        $("#boardCards").html("");
+                        $.each(board_cards, function (i, value) {
+                            let l = $("<img class=\"mb-4\"  src=\"/asserts/img/cards/"+value+" \"height = \"185\">");
+                            l.appendTo($("#boardCards"));
+                        })
                     }
+                    long_polling();
                 } else if (res.code === 200) {
-                    console("哪里出问题了："+res.msg);
+                    console.log("哪里出问题了："+res.msg);
+                    setTimeout(long_polling, 30000);
                 }
 
                 // alert(res.extend.boardCard);
                 // alert(res.extend.playerName);
                 // alert(res.extend.playerOperation);
+            },
+            error: function (e) {
                 long_polling();
             }
         })
-        long_polling();
     }
 
     /*  点击手牌背面发送Ajax请求显示当前手牌  */
@@ -255,8 +258,6 @@
                 },
                 error: function (e) {
                     console.log(e.responseFields);
-                    let a = JSON.parse(e.responseText);
-                    console.log(a);
                 }
             })
         } else if ($("#myCards").attr("if_show") == true) {
@@ -335,10 +336,7 @@
             type: 'get',
             url: "/rungame/begin",
             success: function (res) {
-                long_polling();
-                console(res);
-                let a = JSON.parse(res);
-                console(a);
+                console.log(res);
             },
             error: function (e) {
             }

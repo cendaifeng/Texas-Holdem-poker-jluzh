@@ -10,6 +10,7 @@ import org.springframework.stereotype.Service;
 
 import java.util.*;
 import java.util.concurrent.*;
+import java.util.stream.Collectors;
 
 @Service
 public class RunGame {
@@ -227,34 +228,19 @@ public class RunGame {
 
         /** Flop */
         while (gameStatus != "flop" && gameStatus != "over") {
-            try {
-                Thread.sleep(500);
-            } catch (InterruptedException e) {
-                e.printStackTrace();
-            }
         }
         this.initBoardCards();
-//        Poker[] boardCards = board().getBoardCards();
-//        System.out.println(boardCards[0]+"\n"+boardCards[1]+"\n"+boardCards[2]);
+        Poker[] boardCards = board.getBoardCards();
+        System.out.println(boardCards[0]+"\n"+boardCards[1]+"\n"+boardCards[2]);
 
         /** Turn */
         while (gameStatus != "turn" && gameStatus != "over") {
-            try {
-                Thread.sleep(500);
-            } catch (InterruptedException e) {
-                e.printStackTrace();
-            }
         }
         this.addBoardCards();
 //        System.out.println(board.getBoardCards()[3]);
 
         /** River */
         while (gameStatus != "river" && gameStatus != "over") {
-            try {
-                Thread.sleep(500);
-            } catch (InterruptedException e) {
-                e.printStackTrace();
-            }
         }
         this.addBoardCards();
 //        System.out.println(board.getBoardCards()[4]);
@@ -274,15 +260,26 @@ public class RunGame {
         this.playerName = playerName;
         this.playerOperation = playerOperation;
         this.operationValue = operationValue;
+        ServerResponse serverResponse = new ServerResponse();
 
         logger.debug("nextPlayer");
-        countDownLatch = new CountDownLatch(listenerArrayList.size());
-        ifMsgChange = true;
-        try {
-            countDownLatch.await();
-        } catch (InterruptedException e) {
-            e.printStackTrace();
-        }
+
+        ServerResponse newServerResponse = buildResponse(serverResponse);
+        players.stream().map(x -> x.getMsgQueue()).forEach(x -> {
+            try {
+                x.put(newServerResponse.setCode(100));
+            } catch (InterruptedException e) {
+                e.printStackTrace();
+            }
+        });
+
+//        countDownLatch = new CountDownLatch(listenerArrayList.size());
+//        ifMsgChange = true;
+//        try {
+//            countDownLatch.await();
+//        } catch (InterruptedException e) {
+//            e.printStackTrace();
+//        }
         try {
             // 若玩家队列已用尽，则搜寻玩家列表中尚未完成下注要求的玩家
             if (playerQueue.size() == 0) {
@@ -306,6 +303,43 @@ public class RunGame {
         } catch (InterruptedException e) {
             e.printStackTrace();
         }
+    }
+
+    private ServerResponse buildResponse(ServerResponse serverResponse) {
+        Integer pot = this.getBoard().getPot();
+        System.out.println("======================"+pot+"===================");
+        if (pot != null) {
+            serverResponse.add("pot", pot);
+        }
+
+        Poker[] boardCards = this.getBoard().getBoardCards();
+        if (boardCards[0] != null) {
+            System.out.println("======================"+boardCards[0]+"===================");
+            List<String> cardsList = Arrays.stream(boardCards)
+                    .map(x -> x.getKind().getName() + x.getColor().getName().substring(0, 1) + ".png")
+                    .collect(Collectors.toList());
+            serverResponse.add("boardCards", cardsList);
+        }
+
+//        System.out.println("======================"+playerName+"===================");
+//        if (playerName != null) {
+//            serverResponse.add("playerName", playerName);
+//        }
+//
+//        System.out.println("======================"+playerOperation+"===================");
+//        if (playerOperation != null) {
+//            serverResponse.add("playerOperation", playerOperation);
+//        }
+//
+//        System.out.println("======================"+operationValue+"===================");
+//        if (operationValue != null) {
+//            serverResponse.add("operationValue", operationValue);
+//        }
+//
+//        if (this.getWinner() != null)
+//            serverResponse.add("winner", this.getWinner());
+
+        return serverResponse;
     }
 
     private void nextRound() {

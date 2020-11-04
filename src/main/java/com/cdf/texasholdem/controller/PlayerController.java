@@ -11,8 +11,12 @@ import org.springframework.ui.ModelMap;
 import org.springframework.web.bind.annotation.*;
 
 import javax.servlet.http.HttpSession;
+import java.util.Arrays;
+import java.util.List;
 import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.locks.ReentrantLock;
+import java.util.stream.Collectors;
 
 /**
  * 控制玩家操作的 Controller
@@ -42,25 +46,7 @@ public class PlayerController {
         logger.debug("status:"+tableIndex.toString());
         CopyOnWriteArrayList<Person> players = table.getPlayers();
         Person person = players.get(playerIndex);
-        ServerResponse serverResponse = new ServerResponse();
-
-        int timestamp = 0;
-        while (!table.isMsgChange()) {
-            // 玩家状态为不是当前回合，等待
-            try {
-                Thread.sleep(500);
-            } catch (InterruptedException e) {
-                e.printStackTrace();
-            }
-            timestamp++;
-            if (timestamp >= 60) {
-                serverResponse.add("msg", "超时");
-                serverResponse.setCode(200);
-//                if (table.getWinner() != null)
-//                    serverResponse.add("winner", table.getWinner());
-                return serverResponse;
-            }
-        }
+        
 //        // 开启一个线程，在30s之后将status置为false，防止有人越过前端Ajax超时限制
 //        FutureTask<Integer> futureTask = new FutureTask(() -> {
 //            Thread.sleep(30000);
@@ -71,42 +57,24 @@ public class PlayerController {
 //        });
 //        new Thread(futureTask).start();
 
-        Integer pot = table.getBoard().getPot();
-        System.out.println("======================"+pot+"===================");
-        if (pot != null) {
-            serverResponse.add("pot", pot);
+        ServerResponse poll = null;
+        try {
+            // 若超时则返回 null
+            poll = person.getMsgQueue().poll(30, TimeUnit.SECONDS);
+        } catch (InterruptedException e) {
+            e.printStackTrace();
         }
-
-        Poker[] boardCards = table.getBoard().getBoardCards();
-        System.out.println(boardCards);
-        if (boardCards[0] != null) {
-            serverResponse.add("boardCard", boardCards);
+        if (null == poll) {
+            poll = new ServerResponse();
+            poll.add("msg", "超时");
+            poll.setCode(200);
+            // 虽然是超时返回，但是在前端请求处响应为成功
+            return poll;
         }
-
-        String playerName = table.getPlayerName();
-        System.out.println("======================"+playerName+"===================");
-        if (playerName != null) {
-            serverResponse.add("playerName", playerName);
-        }
-
-        String playerOperation = table.getPlayerOperation();
-        System.out.println("======================"+playerOperation+"===================");
-        if (playerOperation != null) {
-            serverResponse.add("playerOperation", playerOperation);
-        }
-
-        Integer operationValue = table.getOperationValue();
-        System.out.println("======================"+operationValue+"===================");
-        if (operationValue != null) {
-            serverResponse.add("operationValue", operationValue);
-        }
-
         if (person.getStatus())
-            serverResponse.add("msg", "轮到你了");
-        if (table.getWinner() != null)
-            serverResponse.add("winner", table.getWinner());
-        table.getCountDownLatch().countDown();
-        return serverResponse;
+            poll.add("msg", "轮到你了");
+
+        return poll;
     }
 
     /**

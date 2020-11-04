@@ -140,35 +140,35 @@ public class RunGameController {
         logger.trace("GET:/rungame/begin");
         logger.trace(tableIndex.toString()+" 号桌开台");
 
-        reentrantLock.lock();
-        if (table.isRun())
-            return ServerResponse.fail().add("msg", "该桌已经开始游戏");
-        table.setRun(true);
-        // 随机大小盲，唤醒队中第三个玩家（枪口）的下注操作
-        CopyOnWriteArrayList<Person> players = table.getPlayers();
-        table.setPlayerQueue(new ArrayBlockingQueue<Person>(players.size()));
-        ArrayBlockingQueue<Person> playerQueue = table.getPlayerQueue();
-        playerQueue.addAll(players);
-        table.setListenerArrayList(new CopyOnWriteArrayList<Person>(players));
+        synchronized(table) {
+            if (table.isRun())
+                return ServerResponse.fail().add("msg", "该桌已经开始游戏");
+            table.setRun(true);
+            // 随机大小盲，唤醒队中第三个玩家（枪口）的下注操作
+            CopyOnWriteArrayList<Person> players = table.getPlayers();
+            table.setPlayerQueue(new ArrayBlockingQueue<Person>(players.size()));
+            ArrayBlockingQueue<Person> playerQueue = table.getPlayerQueue();
+            playerQueue.addAll(players);
+            table.setListenerArrayList(new CopyOnWriteArrayList<Person>(players));
 //        Collections.shuffle((List<?>) playerQueue);
-        try {
-            Person person = playerQueue.take();
-            playerQueue.put(person);
-            table.playerBetWithoutCheck(person.getPlayerIndex(), 1);
-            person = playerQueue.take();
-            playerQueue.put(person);
-            table.playerBetWithoutCheck(person.getPlayerIndex(), 2);
-        } catch (InterruptedException e) {
-            e.printStackTrace();
-        }
-        table.nextPlayer(null, null, null);
+            try {
+                Person person = playerQueue.take();
+                playerQueue.put(person);
+                table.playerBetWithoutCheck(person.getPlayerIndex(), 1);
+                person = playerQueue.take();
+                playerQueue.put(person);
+                table.playerBetWithoutCheck(person.getPlayerIndex(), 2);
+            } catch (InterruptedException e) {
+                e.printStackTrace();
+            }
+            table.nextPlayer(null, null, null);
 
-        FutureTask<Integer> futureTask = new FutureTask(() -> {
-            table.run();
-            return 1;
-        });
-        new Thread(futureTask).start();
-        reentrantLock.unlock();
+            FutureTask<Integer> futureTask = new FutureTask(() -> {
+                table.run();
+                return 1;
+            });
+            new Thread(futureTask).start();
+        }
         return ServerResponse.success();
     }
 
@@ -179,11 +179,11 @@ public class RunGameController {
         RunGame table = RunGameManager.getRunGameHashMap().get(tableIndex);
         Person person = table.getPlayers().get(playerIndex);
 
+        reentrantLock.lock();
         if (!table.getPlayerQueue().equals(null)) {
-            reentrantLock.lock();
             table.playerFold(playerIndex);
-            reentrantLock.unlock();
         }
+        reentrantLock.unlock();
         session.removeAttribute("playerIndex");
         session.removeAttribute("tableIndex");
         return "login";
