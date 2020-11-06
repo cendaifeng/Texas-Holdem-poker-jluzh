@@ -30,10 +30,9 @@ public class AccessController {
                         Map<String, Object> map, HttpServletResponse response) {
         Person personById = personMapper.getPersonById(id);
         String passwordFormP = personById.getPassword();
-        String name = personById.getName();
 
         if (password.equals(passwordFormP)) {
-            Cookie cookie = new Cookie("loginUser",name);
+            Cookie cookie = new Cookie("loginUser",id);
             cookie.setMaxAge(86400);
             cookie.setPath("/");
             response.addCookie(cookie);

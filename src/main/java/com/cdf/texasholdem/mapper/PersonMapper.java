@@ -14,7 +14,7 @@ public interface PersonMapper {
     @Delete("delete from person where id=#{id}")
     public int deletePersonById(String id);
 
-    @Insert("insert into person(id, password, name) values(#{id}, #{password}, #{name})")
+    @Insert("insert into person(id, password, name, bankroll) values(#{id}, #{password}, #{name}, #{bankroll})")
     public int insertPerson(Person person);
 
     @Update("update person set UUID=#{UUID} where id=#{id}")

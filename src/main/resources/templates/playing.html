@@ -66,29 +66,13 @@
                         <path fill-rule="evenodd" d="M8 1a3.25 3.25 0 0 0-3.25 3.25c0 .186 0 .29.016.41.014.12.045.27.12.527l.19.665-.692-.028a3.25 3.25 0 1 0 2.357 5.334.5.5 0 0 1 .844.518l-.003.005-.006.015-.024.055a21.893 21.893 0 0 1-.438.92 22.38 22.38 0 0 1-1.266 2.197c-.013.018-.02.05.001.09.01.02.021.03.03.036A.036.036 0 0 0 5.9 15h4.2c.01 0 .016-.002.022-.006a.092.092 0 0 0 .029-.035c.02-.04.014-.073.001-.091a22.875 22.875 0 0 1-1.704-3.117l-.024-.054-.006-.015-.002-.004a.5.5 0 0 1 .838-.524c.601.7 1.516 1.168 2.496 1.168a3.25 3.25 0 1 0-.139-6.498l-.699.03.199-.671c.14-.47.14-.745.139-.927V4.25A3.25 3.25 0 0 0 8 1zm2.207 12.024c.225.405.487.848.78 1.294C11.437 15 10.975 16 10.1 16H5.9c-.876 0-1.338-1-.887-1.683.291-.442.552-.88.776-1.283a4.25 4.25 0 1 1-2.007-8.187 2.79 2.79 0 0 1-.009-.064c-.023-.187-.023-.348-.023-.52V4.25a4.25 4.25 0 0 1 8.5 0c0 .14 0 .333-.04.596a4.25 4.25 0 0 1-.46 8.476 4.186 4.186 0 0 1-1.543-.298z"/>
                     </svg>
                     <strong class="mr-auto">变更提示</strong>
-                    <small>11 mins ago</small>
+                    <small>1s ago</small>
                     <button type="button" class="ml-2 mb-1 close" data-dismiss="toast" aria-label="Close">
                         <span aria-hidden="true">&times;</span>
                     </button>
                 </div>
                 <div class="toast-body">
-                    Hello, world! This is a toast message.
-                </div>
-            </div>
-            <div id="myToast2" class="toast" role="alert" aria-live="polite" aria-atomic="true" data-delay="30000" style="position: relative;">
-                <div class="toast-header">
-                    <!--                <img src="..." class="rounded mr-2" alt="...">-->
-                    <svg width="1em" height="1em" viewBox="0 0 16 16" class="rounded mr-2 bi bi-suit-club" fill="currentColor" xmlns="http://www.w3.org/2000/svg">
-                        <path fill-rule="evenodd" d="M8 1a3.25 3.25 0 0 0-3.25 3.25c0 .186 0 .29.016.41.014.12.045.27.12.527l.19.665-.692-.028a3.25 3.25 0 1 0 2.357 5.334.5.5 0 0 1 .844.518l-.003.005-.006.015-.024.055a21.893 21.893 0 0 1-.438.92 22.38 22.38 0 0 1-1.266 2.197c-.013.018-.02.05.001.09.01.02.021.03.03.036A.036.036 0 0 0 5.9 15h4.2c.01 0 .016-.002.022-.006a.092.092 0 0 0 .029-.035c.02-.04.014-.073.001-.091a22.875 22.875 0 0 1-1.704-3.117l-.024-.054-.006-.015-.002-.004a.5.5 0 0 1 .838-.524c.601.7 1.516 1.168 2.496 1.168a3.25 3.25 0 1 0-.139-6.498l-.699.03.199-.671c.14-.47.14-.745.139-.927V4.25A3.25 3.25 0 0 0 8 1zm2.207 12.024c.225.405.487.848.78 1.294C11.437 15 10.975 16 10.1 16H5.9c-.876 0-1.338-1-.887-1.683.291-.442.552-.88.776-1.283a4.25 4.25 0 1 1-2.007-8.187 2.79 2.79 0 0 1-.009-.064c-.023-.187-.023-.348-.023-.52V4.25a4.25 4.25 0 0 1 8.5 0c0 .14 0 .333-.04.596a4.25 4.25 0 0 1-.46 8.476 4.186 4.186 0 0 1-1.543-.298z"/>
-                    </svg>
-                    <strong class="mr-auto">变更提示</strong>
-                    <small>11 mins ago</small>
-                    <button type="button" class="ml-2 mb-1 close" data-dismiss="toast" aria-label="Close">
-                        <span aria-hidden="true">&times;</span>
-                    </button>
-                </div>
-                <div class="toast-body">
-                    Hello, world! This is a toast message.
+                    欢迎来到游戏！队列消息测试
                 </div>
             </div>
         </div>
@@ -197,7 +181,19 @@
 <script th:inline="javascript">
 
     $('#myToast').toast('show');
-    $('#myToast2').toast('show');
+
+    function buildToast(msg) {
+        let l = $("<div class=\"toast\" role=\"alert\" aria-live=\"polite\" aria-atomic=\"true\" data-delay=\"15000\"></div>");
+        l.append($("<div class=\"toast-header\"></div>").append($("<svg width=\"1em\" height=\"1em\" viewBox=\"0 0 16 16\" class=\"rounded mr-2 bi bi-suit-club\" fill=\"currentColor\" xmlns=\"http://www.w3.org/2000/svg\"></svg>")
+            .append("<path fill-rule=\"evenodd\" d=\"M8 1a3.25 3.25 0 0 0-3.25 3.25c0 .186 0 .29.016.41.014.12.045.27.12.527l.19.665-.692-.028a3.25 3.25 0 1 0 2.357 5.334.5.5 0 0 1 .844.518l-.003.005-.006.015-.024.055a21.893 21.893 0 0 1-.438.92 22.38 22.38 0 0 1-1.266 2.197c-.013.018-.02.05.001.09.01.02.021.03.03.036A.036.036 0 0 0 5.9 15h4.2c.01 0 .016-.002.022-.006a.092.092 0 0 0 .029-.035c.02-.04.014-.073.001-.091a22.875 22.875 0 0 1-1.704-3.117l-.024-.054-.006-.015-.002-.004a.5.5 0 0 1 .838-.524c.601.7 1.516 1.168 2.496 1.168a3.25 3.25 0 1 0-.139-6.498l-.699.03.199-.671c.14-.47.14-.745.139-.927V4.25A3.25 3.25 0 0 0 8 1zm2.207 12.024c.225.405.487.848.78 1.294C11.437 15 10.975 16 10.1 16H5.9c-.876 0-1.338-1-.887-1.683.291-.442.552-.88.776-1.283a4.25 4.25 0 1 1-2.007-8.187 2.79 2.79 0 0 1-.009-.064c-.023-.187-.023-.348-.023-.52V4.25a4.25 4.25 0 0 1 8.5 0c0 .14 0 .333-.04.596a4.25 4.25 0 0 1-.46 8.476 4.186 4.186 0 0 1-1.543-.298z\"/>"))
+            .append("<strong class=\"mr-auto\">变更提示</strong>")
+            .append($("<small></small>").append( new Date().toLocaleTimeString() ))
+            .append("<button type=\"button\" class=\"ml-2 mb-1 close\" data-dismiss=\"toast\" aria-label=\"Close\"><span aria-hidden=\"true\">&times;</span></button>"));
+        l.append($("<div class=\"toast-body\"></div>")
+            .append(msg));
+        l.appendTo($("#toastDiv"));
+        l.toast("show");
+    }
 
     /*  发起Ajax长轮询请求，进行游戏状态查询  */
     long_polling();
@@ -230,10 +226,16 @@
                             l.appendTo($("#boardCards"));
                         })
                     }
+
+                    if (res.data.msg != null) {
+                        buildToast(res.data.msg);
+                    }
+
                     long_polling();
                 } else if (res.code === 200) {
-                    console.log("哪里出问题了："+res.msg);
-                    setTimeout(long_polling, 30000);
+                    buildToast(res.data.msg);
+
+                    long_polling();
                 }
 
                 // alert(res.extend.boardCard);

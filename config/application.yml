@@ -25,10 +25,10 @@ spring:
 
   datasource:
     # 数据源基本配置
-    username: root
-    password: abc123
+    username: cdf
+    password: Qq030481603
     driver-class-name: com.mysql.cj.jdbc.Driver
-    url: jdbc:mysql://localhost:3306/texas?serverTimezone=UTC
+    url: jdbc:mysql://rm-wz9mt4t1p8q7isu038o.mysql.rds.aliyuncs.com:3306/texas
     type: com.alibaba.druid.pool.DruidDataSource
     # 数据源其他配置
     initialSize: 5

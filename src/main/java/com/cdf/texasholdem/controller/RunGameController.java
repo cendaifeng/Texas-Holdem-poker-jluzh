@@ -8,11 +8,13 @@ import com.cdf.texasholdem.service.RunGameManager;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.context.annotation.Scope;
 import org.springframework.stereotype.Controller;
 import org.springframework.web.bind.annotation.*;
 
 import javax.servlet.http.*;
 import java.util.concurrent.ArrayBlockingQueue;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.FutureTask;
 import java.util.concurrent.locks.ReentrantLock;
@@ -24,6 +26,7 @@ import static com.cdf.texasholdem.utils.NetUtil.getGivenCookies;
  * 选牌桌，开始游戏，退出牌桌
  */
 @Controller
+@Scope("prototype")
 public class RunGameController {
 
     @Autowired
@@ -63,6 +66,7 @@ public class RunGameController {
     public String createTable(@RequestParam Integer tableIndex) {
 
         RunGameManager.addRunGame(tableIndex, runGame);
+        runGame.setConfirmLeftMap(new ConcurrentHashMap<String, Boolean>());
         logger.trace("POST:/rungame/create");
         return "forward:/rungame/access";
     }
@@ -101,6 +105,7 @@ public class RunGameController {
         }
         // 到数据库中找person
         Person person = personMapper.getPersonById(userid);
+        System.out.println(person);
         if (person.getBankRoll()<2) {
             logger.error("该玩家没钱");
             return "/rungame/list";
@@ -146,10 +151,10 @@ public class RunGameController {
             table.setRun(true);
             // 随机大小盲，唤醒队中第三个玩家（枪口）的下注操作
             CopyOnWriteArrayList<Person> players = table.getPlayers();
-            table.setPlayerQueue(new ArrayBlockingQueue<Person>(players.size()));
+            table.setPlayingPlayers(new CopyOnWriteArrayList<>(players));
+            table.setPlayerQueue(new ArrayBlockingQueue<Person>(players.size(), true, players));
+
             ArrayBlockingQueue<Person> playerQueue = table.getPlayerQueue();
-            playerQueue.addAll(players);
-            table.setListenerArrayList(new CopyOnWriteArrayList<Person>(players));
 //        Collections.shuffle((List<?>) playerQueue);
             try {
                 Person person = playerQueue.take();
@@ -158,10 +163,10 @@ public class RunGameController {
                 person = playerQueue.take();
                 playerQueue.put(person);
                 table.playerBetWithoutCheck(person.getPlayerIndex(), 2);
+                table.nextPlayer(null, null, null);
             } catch (InterruptedException e) {
                 e.printStackTrace();
             }
-            table.nextPlayer(null, null, null);
 
             FutureTask<Integer> futureTask = new FutureTask(() -> {
                 table.run();

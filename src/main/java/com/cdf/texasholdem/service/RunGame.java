@@ -6,6 +6,7 @@ import com.cdf.texasholdem.utils.GameUtil;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.context.annotation.Scope;
 import org.springframework.stereotype.Service;
 
 import java.util.*;
@@ -13,6 +14,7 @@ import java.util.concurrent.*;
 import java.util.stream.Collectors;
 
 @Service
+@Scope("prototype")
 public class RunGame {
 
     @Autowired
@@ -33,18 +35,13 @@ public class RunGame {
     private boolean isRun = false;
 
     private Person winner = null;
+
+    // 游戏中未弃牌的玩家，玩家弃牌后被删除
+    private CopyOnWriteArrayList<Person> playingPlayers = null;
     // RunGameController.begin() 调用时定义
     private ArrayBlockingQueue<Person> playerQueue = null;
     // this.run() 时定义
     private ArrayBlockingQueue<String> gameStatusQueue = null;
-
-    /**
-     * 以下字段用于 PlayerContoller 对牌桌的游戏状态监听
-     */
-    // 专用于状态监听，玩家在弃牌后不会被删除
-    private CopyOnWriteArrayList<Person> listenerArrayList = null;
-    // nextPlayer()时置为true。在所有玩家接受完状态变更信息后置为false
-    private boolean ifMsgChange = false;
 
     private String playerOperation = null;
 
@@ -52,7 +49,7 @@ public class RunGame {
 
     private String playerName;
 
-    private CountDownLatch countDownLatch = null;
+    public ConcurrentHashMap<String, Boolean> confirmLeftMap = null;
 
     Logger logger = LoggerFactory.getLogger(this.getClass());
 
@@ -70,23 +67,29 @@ public class RunGame {
     }
 
     public void RunGameReset() {
-        players = new CopyOnWriteArrayList<Person>();
         board = new Board();
         cards = CardOutOfOrder();
         callLimited = 0;
         playerQueue = null;
         gameStatus = null;
-        listenerArrayList = null;
         winner = null;
         isRun = false;
     }
 
-    public CopyOnWriteArrayList<Person> getListenerArrayList() {
-        return listenerArrayList;
+    public CopyOnWriteArrayList<Person> getPlayingPlayers() {
+        return playingPlayers;
     }
 
-    public void setListenerArrayList(CopyOnWriteArrayList<Person> listenerArrayList) {
-        this.listenerArrayList = listenerArrayList;
+    public void setPlayingPlayers(CopyOnWriteArrayList<Person> playingPlayers) {
+        this.playingPlayers = playingPlayers;
+    }
+
+    public ConcurrentHashMap<String, Boolean> getConfirmLeftMap() {
+        return confirmLeftMap;
+    }
+
+    public void setConfirmLeftMap(ConcurrentHashMap<String, Boolean> confirmLeftMap) {
+        this.confirmLeftMap = confirmLeftMap;
     }
 
     public boolean isRun() {
@@ -145,22 +148,6 @@ public class RunGame {
         this.tableIndex = tableIndex;
     }
 
-    public boolean isMsgChange() {
-        return ifMsgChange;
-    }
-
-    public void setIfMsgChange(boolean ifMsgChange) {
-        this.ifMsgChange = ifMsgChange;
-    }
-
-    public CountDownLatch getCountDownLatch() {
-        return countDownLatch;
-    }
-
-    public void setCountDownLatch(CountDownLatch countDownLatch) {
-        this.countDownLatch = countDownLatch;
-    }
-
     public String getPlayerOperation() {
         return playerOperation;
     }
@@ -190,36 +177,26 @@ public class RunGame {
      */
     public void run() {
 
-        this.gameStatusQueue = new ArrayBlockingQueue<String>(5, false, Arrays.asList(
+        gameStatusQueue = new ArrayBlockingQueue<String>(5, false, Arrays.asList(
                 "begin","flop","turn","river","over"));
-        try {
-            setGameStatus(gameStatusQueue.take());
-        } catch (InterruptedException e) {
-            e.printStackTrace();
-        }
-        this.licensingToPlayer();
+        setGameStatus(gameStatusQueue.remove());
+        licensingToPlayer();
 
         // 开启一条新线程检测是否直接来到over状态
         CompletableFuture<Person> future = CompletableFuture.supplyAsync(() -> {
+            System.out.println("CompletableFuture.supplyAsync() 监听中");
             while (gameStatus != "over") {
-                try {
-                    Thread.sleep(500);
-                } catch (InterruptedException e) {
-                    e.printStackTrace();
-                }
             }
             return this.compareValue();
         });
         // 注册事件“监听”
         future.whenComplete((v, e) -> {
-			System.out.println(v);
-			System.out.println(e);
             try {
-                Person person = future.get();  // 阻塞
-                setWinner(person);
-                person.setBankRoll(person.getBankRoll() + board.getPot());
-                personMapper.updateBankRoll(person);
-                logger.trace("game over! the winner is "+person.toString());
+                Person person = future.get();
+                setWinner(v);
+                person.setBankRoll(v.getBankRoll() + board.getPot());
+                personMapper.updateBankRoll(v);
+                logger.trace("game over! the winner is "+v.toString());
                 this.RunGameReset();
             } catch (Exception ex) {
                 ex.printStackTrace();
@@ -237,14 +214,28 @@ public class RunGame {
         while (gameStatus != "turn" && gameStatus != "over") {
         }
         this.addBoardCards();
-//        System.out.println(board.getBoardCards()[3]);
 
         /** River */
         while (gameStatus != "river" && gameStatus != "over") {
         }
         this.addBoardCards();
-//        System.out.println(board.getBoardCards()[4]);
         return;
+    }
+
+    /**
+     * 确认所有人玩家是否在线，若不在线则将其踢出当前牌桌玩家列表
+     * 该函数与 PlayerController 的 polling 交流，关联 RunGame 的 HashMap
+     * 每隔 60s 确认一次
+     * 由 run() 调用
+     */
+    public void confirmPlayersLeft() {
+        while(true) {
+            try {
+                TimeUnit.SECONDS.sleep(60);
+            } catch (InterruptedException e) {
+                e.printStackTrace();
+            }
+        }
     }
 
     /**
@@ -273,17 +264,10 @@ public class RunGame {
             }
         });
 
-//        countDownLatch = new CountDownLatch(listenerArrayList.size());
-//        ifMsgChange = true;
-//        try {
-//            countDownLatch.await();
-//        } catch (InterruptedException e) {
-//            e.printStackTrace();
-//        }
         try {
             // 若玩家队列已用尽，则搜寻玩家列表中尚未完成下注要求的玩家
             if (playerQueue.size() == 0) {
-                Iterator<Person> i = players.iterator();
+                Iterator<Person> i = playingPlayers.iterator();
                 while (i.hasNext()) {
                     Person next = i.next();
                     if (next.getCurrentWager()<callLimited && !next.isAllin()) {
@@ -298,10 +282,24 @@ public class RunGame {
                 Person person = playerQueue.take();
                 logger.debug("P:"+person.toString());
                 person.setStatus(true);
-                //this.playerQueue.put(person);
             }
         } catch (InterruptedException e) {
             e.printStackTrace();
+        }
+    }
+
+    private void nextRound() {
+        logger.debug("nextRound");
+        if (playingPlayers.size() == 1) {
+            setGameStatus("over");
+            gameStatusQueue.clear();
+        }
+        if (gameStatusQueue.size() > 0) {
+            String status = gameStatusQueue.remove();
+            setGameStatus(status);
+            playerQueue.addAll(playingPlayers);
+            logger.debug("now gameStatus: "+status);
+            nextPlayer(null, null, null);
         }
     }
 
@@ -340,25 +338,6 @@ public class RunGame {
 //            serverResponse.add("winner", this.getWinner());
 
         return serverResponse;
-    }
-
-    private void nextRound() {
-        logger.debug("nextRound");
-        if (players.size() == 1) {
-            setGameStatus("over");
-            gameStatusQueue.clear();
-        }
-        if (gameStatusQueue.size() > 0) {
-            try {
-                String status = gameStatusQueue.take();
-                setGameStatus(status);
-                playerQueue.addAll(players);
-                logger.debug("now gameStatus: "+status);
-                nextPlayer(null, null, null);
-            } catch (InterruptedException e) {
-                e.printStackTrace();
-            }
-        }
     }
 
     /**
@@ -449,11 +428,11 @@ public class RunGame {
         Person player = null;
         try {
             player = this.players.get(index);
-            //this.getPlayerQueue().remove(player);
+            this.getPlayerQueue().remove(player);  // 不抛异常
         } catch (Exception e) {
             logger.error("playerFold失败，可能是重复提交请求");
         }
-        return this.players.remove(player);
+        return this.playingPlayers.remove(player);
     }
 
     /**

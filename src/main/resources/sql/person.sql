@@ -1,5 +1,4 @@
 
-DROP TABLE IF EXISTS `employee`;
 CREATE TABLE `person` (
   `id` varchar (31) NOT NULL,
   `password` varchar (255) NOT NULL,

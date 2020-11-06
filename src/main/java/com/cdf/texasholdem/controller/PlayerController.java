@@ -26,8 +26,6 @@ import java.util.stream.Collectors;
 @RestController
 public class PlayerController {
 
-    private static final ReentrantLock reentrantLock = new ReentrantLock();
-
     Logger logger = LoggerFactory.getLogger(this.getClass());
 
     /**
@@ -109,17 +107,17 @@ public class PlayerController {
         RunGame table = RunGameManager.getRunGameHashMap().get(tableIndex);
         Person person = table.getPlayers().get(playerIndex);
 
-        reentrantLock.lock();
-        if (person.getCurrentWager() + wager >= table.getCallLimited()) {
-            if (!table.playerBet(playerIndex, wager)) {
-                return ServerResponse.fail().add("msg", "错误：玩家金额不足或未到玩家回合");
+        synchronized (person) {
+            if (person.getCurrentWager() + wager >= table.getCallLimited()) {
+                if (!table.playerBet(playerIndex, wager)) {
+                    return ServerResponse.fail().add("msg", "错误：玩家金额不足或未到玩家回合");
+                }
+                table.nextPlayer(person.getName(), "bet", wager);
+                person.setStatus(false);
+            } else {
+                return ServerResponse.fail().add("msg", "错误：下注小于最小跟注限制");
             }
-            table.nextPlayer(person.getName(), "bet", wager);
-            person.setStatus(false);
-        } else {
-            return ServerResponse.fail().add("msg", "错误：下注小于最小跟注限制");
         }
-        reentrantLock.unlock();
         return ServerResponse.success();
     }
 
@@ -137,17 +135,17 @@ public class PlayerController {
         RunGame table = RunGameManager.getRunGameHashMap().get(tableIndex);
         Person person = table.getPlayers().get(playerIndex);
 
-        reentrantLock.lock();
-        if (person.getCurrentWager() >= table.getCallLimited()) {
-            // 检验是否在玩家回合
-            if (!person.getStatus())
-                return ServerResponse.fail().add("msg", "错误：未到玩家回合");
-            table.nextPlayer(person.getName(), "check", null);
-            person.setStatus(false);
-        } else {
-            return ServerResponse.fail().add("msg", "错误：下注小于最小跟注限制，不能过牌");
+        synchronized (person) {
+            if (person.getCurrentWager() >= table.getCallLimited()) {
+                // 检验是否在玩家回合
+                if (!person.getStatus())
+                    return ServerResponse.fail().add("msg", "错误：未到玩家回合");
+                table.nextPlayer(person.getName(), "check", null);
+                person.setStatus(false);
+            } else {
+                return ServerResponse.fail().add("msg", "错误：下注小于最小跟注限制，不能过牌");
+            }
         }
-        reentrantLock.unlock();
         return ServerResponse.success();
     }
 
@@ -164,17 +162,17 @@ public class PlayerController {
         Person person = table.getPlayers().get(tableIndex);
 
         Integer wager = person.getBankRoll();
-        reentrantLock.lock();
-        if (!table.playerBet(playerIndex, wager))
-            ServerResponse.fail().add("msg", "错误：玩家金额不足或未到玩家回合");
-        if (person.getCurrentWager() > table.getCallLimited()) {
-            // 已更新过已下注金额
-            table.setCallLimited(person.getCurrentWager());
+        synchronized (person) {
+            if (!table.playerBet(playerIndex, wager))
+                ServerResponse.fail().add("msg", "错误：玩家金额不足或未到玩家回合");
+            if (person.getCurrentWager() > table.getCallLimited()) {
+                // 已更新过已下注金额
+                table.setCallLimited(person.getCurrentWager());
+            }
+            person.setAllin(true);
+            table.nextPlayer(person.getName(), "allin", wager);
+            person.setStatus(false);
         }
-        person.setAllin(true);
-        table.nextPlayer(person.getName(), "allin", wager);
-        person.setStatus(false);
-        reentrantLock.unlock();
         return ServerResponse.success();
     }
 
@@ -191,11 +189,11 @@ public class PlayerController {
         RunGame table = RunGameManager.getRunGameHashMap().get(tableIndex);
         Person person = table.getPlayers().get(playerIndex);
 
-        reentrantLock.lock();
-        table.playerFold(playerIndex);
-        table.nextPlayer(person.getName(), "fold", null);
-        person.setStatus(false);
-        reentrantLock.unlock();
+        synchronized (person) {
+            table.playerFold(playerIndex);
+            table.nextPlayer(person.getName(), "fold", null);
+            person.setStatus(false);
+        }
         return ServerResponse.success();
     }
 

@@ -11,7 +11,6 @@ import java.util.concurrent.LinkedBlockingQueue;
 public class Person {
 
     private Poker[] pokers = new Poker[2];
-    private Integer bankroll;
     private Integer currentWager = 0;
     private Integer playerIndex = -1;
     private boolean status = false;
@@ -20,12 +19,13 @@ public class Person {
     private LinkedBlockingQueue<ServerResponse> MsgQueue = new LinkedBlockingQueue();
     // for DAO
     private String UUID;
-    @Pattern(regexp = "(^[a-zA-Z0-9_-]{6,16}$)",
-            message = "用户名必须为 6-16 位英文与数字的组合")
+    @Pattern(regexp = "(^[a-zA-Z0-9_-]{5,16}$)",
+            message = "用户名必须为 5-16 位英文(或)数字的组合")
     private String id;
     @NotBlank
     private String password;
     private String name;
+    private Integer bankroll = 0;
 
     public Person() { }
 
